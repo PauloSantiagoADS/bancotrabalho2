@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Formulário de Evento e Mapa</title>
+  <!-- Outras tags e estilos -->
+
+  <!-- Incluindo a biblioteca do Google Maps JavaScript API -->
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAIpC4LC3VKqUKViZwEbMW5jh3KyuMx_yk&callback=initMap" async defer></script>
+
+  <style>
+    #map {
+      height: 400px;
+      width: 100%;
+    }
+  </style>
+
+<button onclick="fetchEventList()">Listar Eventos</button>
+<ul id="event-list"></ul>
+
+  <script>
+    let marker;
+
+    // Função para exibir o mapa com um marcador nas coordenadas geográficas
+    function displayMapWithMarker(latitude, longitude) {
+      const mapDiv = document.getElementById('map');
+      mapDiv.innerHTML = '';
+
+      const location = new google.maps.LatLng(latitude, longitude);
+
+      const mapOptions = {
+        zoom: 12,
+        center: location,
+      };
+
+      const map = new google.maps.Map(mapDiv, mapOptions);
+
+      marker = new google.maps.Marker({
+        position: location,
+        map: map,
+      });
+
+      map.addListener('click', (event) => {
+        const clickedLocation = event.latLng;
+        marker.setPosition(clickedLocation);
+
+        // Preencha os campos do formulário com as coordenadas
+        document.getElementById('latitude').value = clickedLocation.lat();
+        document.getElementById('longitude').value = clickedLocation.lng();
+
+        // Obter o nome do local a partir das coordenadas
+        const geocoder = new google.maps.Geocoder();
+        geocoder.geocode({ location: clickedLocation }, (results, status) => {
+          if (status === 'OK') {
+            if (results[0]) {
+              const formattedAddress = results[0].formatted_address;
+              document.getElementById('location').value = formattedAddress;
+            }
+          } else {
+            console.error('Geocoding failed:', status);
+          }
+        });
+      });
+    }
+
+    // Função para lidar com a busca de eventos
+function handleSearchEvent() {
+  const searchText = document.getElementById('searchText').value;
+
+  // Fazer a chamada para a rota de busca
+  fetch(`http://localhost:3000/api/event/search?q=${encodeURIComponent(searchText)}`)
+    .then(response => response.json())
+    .then(events => {
+      console.log('Eventos encontrados:', events);
+      // Aqui você pode realizar outras ações com os eventos encontrados
+    })
+    .catch(error => {
+      console.error('Erro ao buscar eventos:', error);
+    });
+}
+
+
+    // Função para lidar com o envio do formulário de evento
+    function handleEventFormSubmit(event) {
+      event.preventDefault();
+      console.log('handleEventFormSubmit called');
+
+      // Obter os valores dos campos do formulário
+      const title = document.getElementById('title').value;
+      const description = document.getElementById('description').value;
+      const startDate = document.getElementById('startDate').value;
+      const endDate = document.getElementById('endDate').value;
+      const latitude = document.getElementById('latitude').value;
+      const longitude = document.getElementById('longitude').value;
+
+      // Criar um objeto de evento com os valores
+      const eventObject = {
+        title: title,
+        description: description,
+        startDate: startDate,
+        endDate: endDate,
+        location: document.getElementById('location').value,
+        latitude: parseFloat(latitude),
+        longitude: parseFloat(longitude),
+      };
+
+      // Enviar os dados do evento para a rota de salvamento
+      fetch('http://localhost:3000/api/event', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(eventObject),
+      })
+      .then(response => response.json())
+      .then(newEvent => {
+        console.log('Evento criado:', newEvent);
+        // Aqui você pode realizar outras ações, como atualizar a lista de eventos
+      })
+      .catch(error => {
+        console.error('Erro ao criar evento:', error);
+      });
+
+      // Limpar os campos do formulário após o envio
+      document.getElementById('event-form').reset();
+
+      // Chamar a função para exibir o mapa com as coordenadas informadas
+      displayMapWithMarker(0, 0);
+    }
+
+    // Função de inicialização do mapa
+    function initMap() {
+      // Coordenadas do local que deseja exibir no mapa
+      const latitude = -23.5505;
+      const longitude = -46.6333;
+
+      // Chamar a função para exibir o mapa com as coordenadas informadas
+      displayMapWithMarker(latitude, longitude);
+    }
+
+    // Função para listar os eventos do banco de dados
+  function fetchEventList() {
+    fetch('http://localhost:3000/api/event')
+      .then(response => response.json())
+      .then(events => {
+        const eventList = document.getElementById('event-list');
+        eventList.innerHTML = '';
+
+        events.forEach(event => {
+  const listItem = document.createElement('li');
+  const eventInfo = document.createElement('p');
+  eventInfo.textContent = `Título: ${event.title}, Descrição: ${event.description}, Localização: ${event.location}, Data de Início: ${event.startDate}, Data de Término: ${event.endDate}`;
+  listItem.appendChild(eventInfo);
+  eventList.appendChild(listItem);
+});
+
+      })
+      .catch(error => {
+        console.error('Erro ao listar eventos:', error);
+      });
+  }
+
+  // Função para deletar um evento
+function deleteEvent() {
+  const eventId = document.getElementById('eventId').value;
+
+  fetch(`http://localhost:3000/api/event/${eventId}`, {
+    method: 'DELETE'
+  })
+    .then(response => response.json())
+    .then(result => {
+      console.log('Evento deletado:', result);
+      // Aqui você pode realizar outras ações, como atualizar a lista de eventos
+    })
+    .catch(error => {
+      console.error('Erro ao deletar evento:', error);
+    });
+
+  // Limpar o campo do ID após a exclusão
+  document.getElementById('eventId').value = '';
+}
+
+// Função para lidar com a atualização do evento
+function handleUpdateEvent() {
+  const eventId = document.getElementById('eventId').value;
+  if (!eventId) {
+    console.error('ID do evento não fornecido');
+    return;
+  }
+
+  // Obter os valores dos campos do formulário
+  const title = document.getElementById('title').value;
+  const description = document.getElementById('description').value;
+  const startDate = document.getElementById('startDate').value;
+  const endDate = document.getElementById('endDate').value;
+  const latitude = document.getElementById('latitude').value;
+  const longitude = document.getElementById('longitude').value;
+
+  // Criar um objeto de evento com os valores atualizados
+  const updatedEvent = {
+    title: title,
+    description: description,
+    startDate: startDate,
+    endDate: endDate,
+    location: document.getElementById('location').value,
+    latitude: parseFloat(latitude),
+    longitude: parseFloat(longitude),
+  };
+
+  // Enviar os dados atualizados do evento para a rota de atualização
+  fetch(`http://localhost:3000/api/event/${eventId}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(updatedEvent),
+  })
+    .then(response => response.json())
+    .then(updatedEvent => {
+      console.log('Evento atualizado:', updatedEvent);
+      // Aqui você pode realizar outras ações após a atualização do evento
+    })
+    .catch(error => {
+      console.error('Erro ao atualizar evento:', error);
+    });
+}
+
+// Função para lidar com a busca de eventos
+function handleSearchEvent() {
+    const searchText = document.getElementById('searchText').value;
+
+    // Fazer a chamada para a rota de busca
+    fetch(`http://localhost:3000/api/event/search?q=${encodeURIComponent(searchText)}`)
+      .then(response => response.json())
+      .then(events => {
+        console.log('Eventos encontrados:', events);
+
+        // Limpar a lista de eventos
+        const eventList = document.getElementById('event-list');
+        eventList.innerHTML = '';
+
+        // Exibir os eventos na lista
+        events.forEach(event => {
+          const listItem = document.createElement('li');
+          const eventInfo = document.createElement('p');
+          eventInfo.textContent = `Título: ${event.title}, Descrição: ${event.description}, Localização: ${event.location}, Data de Início: ${event.startDate}, Data de Término: ${event.endDate}`;
+          listItem.appendChild(eventInfo);
+          eventList.appendChild(listItem);
+        });
+      })
+      .catch(error => {
+        console.error('Erro ao buscar eventos:', error);
+      });
+  }
+
+  </script>
+</head>
+<body>
+  <h1>Formulário de Evento</h1>
+
+  <form id="event-form" onsubmit="handleEventFormSubmit(event)">
+    <label for="title">Título:</label>
+    <input type="text" id="title" name="title" required>
+
+    <label for="description">Descrição:</label>
+    <textarea id="description" name="description" required></textarea>
+
+    <label for="startDate">Data de Início:</label>
+    <input type="date" id="startDate" name="startDate" required>
+
+    <label for="endDate">Data de Término:</label>
+    <input type="date" id="endDate" name="endDate" required>
+
+    <label for="latitude">Latitude:</label>
+    <input type="text" id="latitude" name="latitude" readonly>
+
+    <label for="longitude">Longitude:</label>
+    <input type="text" id="longitude" name="longitude" readonly>
+
+    <input type="hidden" id="location" name="location">
+
+    <h2>Deletar Evento</h2>
+    <input type="text" id="eventId" placeholder="ID do Evento">
+    <button onclick="deleteEvent()">Deletar</button>
+
+    
+
+<button type="button" onclick="handleUpdateEvent()">Atualizar</button>
+
+    
+    <button type="submit">Salvar</button>
+
+    
+
+
+
+  </form>
+
+  <h1>Mapa</h1>
+  <div id="map"></div>
+</body>
+</html>
